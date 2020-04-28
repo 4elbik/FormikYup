@@ -1,0 +1,22 @@
+.dynamic-input .ant-form-item-label {
+  text-align: left;
+}
+
+.dynamic-input__fields-wrapper {
+  display: flex;
+}
+
+.dynamic-input__fields {
+  width: 60%;
+}
+
+.dynamic-input__field-item .ant-form-item-label {
+  width: 100%;
+}
+
+.dynamic-input__add-skill {
+  margin-top: auto;
+  margin-left: auto;
+  width: 40%;
+  height: 100%;
+}

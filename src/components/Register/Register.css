@@ -1,0 +1,36 @@
+.submitting-form {
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.register-form .error {
+  border-color: tomato;
+}
+
+.register-form .error:focus {
+  box-shadow: 0 0 0 2px #f9ecec;;
+}
+
+.register-form .input-feedback {
+  color: tomato;
+}
+
+.select-before {
+  width: 90px;
+}
+
+.select-after {
+  width: 80px;
+}
+
+[data-theme='compact'] .select-before {
+  width: 71px;
+}
+
+[data-theme='compact'] .select-after {
+  width: 65px;
+}
