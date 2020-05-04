@@ -1,68 +1,113 @@
 import React from 'react';
-import { Formik, Form, Field } from 'formik';
-import DynamicInput from '../DymanicInput';
+import { Formik, Form } from 'formik';
 import * as yup from 'yup';
+import classNames from 'classnames';
 import axios from 'axios';
-import { Button, Input, Checkbox, Select } from 'antd';
-// import { PoweroffOutlined, MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { Button, Input, Checkbox, Select, notification } from 'antd';
+import Preloader from '../Preloader';
+import DynamicInput from '../DymanicInput';
+import { ADD_NEW_USER_URL } from '../../config';
 import './Register.css';
 
-
 const SignupSchema = yup.object().shape({
-  name: yup.string()
-    .min(3, 'Too Short!')
-    .max(50, 'Too Long!')
-    .required('Required'),
-  email: yup.string()
-    .email('Invalid email')
-    .required('Required'),
-  password: yup.string()
+  name: yup.string().min(3, 'Too Short!').max(50, 'Too Long!').required('Required'),
+  email: yup.string().email('Invalid email').required('Required'),
+  password: yup
+    .string()
     .min(8, 'Password is too short - should be 8 chars long minimum')
     .max(40, 'Password is too long - should be less then 40 chars long')
     .matches(/(?=.*[0-9])/, 'Password should contain a number')
     .required('Required'),
-  passwordRepeat: yup.string()
+  passwordRepeat: yup
+    .string()
     .oneOf([yup.ref('password')], 'Passwords are not the same')
     .required('Required'),
-  age: yup.number()
+  age: yup
+    .number()
     .required('We need to know how old are you, please write it in range 18 to 65')
     .positive('Minus years old, really?')
     .integer()
     .min(18, 'Sorry, but you just kid')
     .max(65, 'Sorry, but you just old'),
   website: yup.string().url(),
-  accept: yup.bool().oneOf([true], 'Please check the accept rules and agree with them if you want to continue.'),
+  accept: yup
+    .bool()
+    .oneOf([true], 'Please check the accept rules and agree with them if you want to continue.'),
 });
 
 const { Option } = Select;
 const DEFAULT_DOMAIN_PROTOCOL = 'http://';
 const DEFAULT_DOMAIN_ZONE = '.com';
 const selectBefore = (handleChange) => (
-  <Field component="select" name="domainProtocol" defaultValue={DEFAULT_DOMAIN_PROTOCOL} className="select-before" onChange={handleChange}>
-    <option value={DEFAULT_DOMAIN_PROTOCOL}>{DEFAULT_DOMAIN_PROTOCOL}</option>
-    <option value="https://">https://</option>
-  </Field>
+  <Select
+    name="domainProtocol"
+    defaultValue={DEFAULT_DOMAIN_PROTOCOL}
+    className="select-before"
+    onChange={handleChange}
+  >
+    <Option value={DEFAULT_DOMAIN_PROTOCOL}>{DEFAULT_DOMAIN_PROTOCOL}</Option>
+    <Option value="https://">https://</Option>
+  </Select>
 );
 const selectAfter = (handleChange) => (
-  <Field component="select" name="domainZone" defaultValue={DEFAULT_DOMAIN_ZONE} className="select-after" onChange={handleChange}>
-    <option value={DEFAULT_DOMAIN_ZONE}>{DEFAULT_DOMAIN_ZONE}</option>
-    <option value=".jp">.jp</option>
-    <option value=".cn">.cn</option>
-    <option value=".org">.org</option>
-  </Field>
+  <Select
+    name="domainZone"
+    defaultValue={DEFAULT_DOMAIN_ZONE}
+    className="select-after"
+    onChange={handleChange}
+  >
+    <Option value={DEFAULT_DOMAIN_ZONE}>{DEFAULT_DOMAIN_ZONE}</Option>
+    <Option value=".jp">.jp</Option>
+    <Option value=".cn">.cn</Option>
+    <Option value=".org">.org</Option>
+  </Select>
 );
+const openSuccessfullNotificationWithIcon = (type) => {
+  notification[type]({
+    message: 'User successfully registered',
+  });
+};
 
-class Register extends React.Component {
+class Register extends React.PureComponent {
   state = {
     skills: [],
-  }
+    resetSkills: false,
+  };
 
-  onFinishDynamicInputSkills = ({ skills }) => {
-    this.setState({ skills });
-  }
+  onUpdateSkills = (handleChange) => async (skills) => {
+    await this.setState({ skills: skills.map((el) => el.name).filter((el) => el !== '') });
+    // eslint-disable-next-line
+    handleChange({ target: { name: 'skills', value: this.state.skills } });
+  };
+
+  onChangeDomainProtocol = (handleChangeFormik) => (value) => {
+    handleChangeFormik({ target: { name: 'domainProtocol', value } });
+  };
+
+  onChangeDomainZone = (handleChangeFormik) => (value) => {
+    handleChangeFormik({ target: { name: 'domainZone', value } });
+  };
+
+  onResetSkills = () => {
+    this.setState({ resetSkills: true });
+    setTimeout(() => {
+      this.setState({ resetSkills: false });
+    }, 500);
+  };
 
   render() {
-    const { skills } = this.state;
+    const { resetSkills } = this.state;
+
+    const inputClassName = (field, errors, touched) => {
+      return classNames({ error: errors[field] && touched[field] });
+    };
+
+    const preloaderClassName = (isSubmitting) => {
+      return classNames({
+        'submitting-form': isSubmitting,
+        'visually-hidden': !isSubmitting,
+      });
+    };
 
     return (
       <div className="register-wrapper">
@@ -76,52 +121,103 @@ class Register extends React.Component {
             domainName: '',
             domainZone: DEFAULT_DOMAIN_ZONE,
             age: '',
-            skills: skills,
+            // skills: skills,
+            skills: [],
             accept: true,
           }}
           validationSchema={SignupSchema}
-          onSubmit={(values, { setSubmitting }) => {
+          onSubmit={async (values, { setSubmitting, setFieldError, resetForm }) => {
+            const { domainProtocol, domainName, domainZone, passwordRepeat, ...newValues } = values;
             if (values.domainName !== '') {
-              const website = values.domainProtocol + values.domainName + values.domainZone;
-              values.website = website;
+              const website = domainProtocol + domainName + domainZone;
+              newValues.website = website;
             }
             setSubmitting(true);
-            axios.post('http://127.0.0.1:8080/sign-up', values).then((response) => console.log(response, 'ОТВЕТ!!!'));
+            const response = await axios.post(ADD_NEW_USER_URL, newValues);
             setSubmitting(false);
+            if (response.data.name === 'ValidationError') {
+              setFieldError(response.data.path, response.data.message);
+            } else {
+              openSuccessfullNotificationWithIcon('success');
+              resetForm();
+              this.onResetSkills();
+            }
           }}
         >
-          {({ values, errors, touched, handleChange, handleBlur, isSubmitting }) => (
-            <div className={isSubmitting ? 'submitting-form' : ''}>
+          {(datatatata) => {
+            const { values, errors, touched, handleChange, handleBlur, isSubmitting } = datatatata;
+            return (
               <Form className="register-form">
                 <label>
                   Name:
-                  <Input className={errors.name && touched.name && 'error'} name="name" onChange={handleChange} onBlur={handleBlur} value={values.name} />
+                  <Input
+                    className={inputClassName('name', errors, touched)}
+                    name="name"
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    value={values.name}
+                  />
                 </label>
-                {errors.name && touched.name && (<div className="input-feedback">{errors.name}</div>)}
+                {errors.name && touched.name && <div className="input-feedback">{errors.name}</div>}
                 <label>
                   Password:
-                  <Input.Password className={errors.password && touched.password && 'error'} placeholder="NotQWERTY" name="password" onChange={handleChange} onBlur={handleBlur} value={values.password} />
+                  <Input.Password
+                    className={inputClassName('password', errors, touched)}
+                    name="password"
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    value={values.password}
+                  />
                 </label>
-                {errors.password && touched.password && (<div className="input-feedback">{errors.password}</div>)}
+                {errors.password && touched.password && (
+                  <div className="input-feedback">{errors.password}</div>
+                )}
                 <label>
                   Password repeat:
-                  <Input.Password className={errors.passwordRepeat && touched.passwordRepeat && 'error'} name="passwordRepeat" onChange={handleChange} onBlur={handleBlur} value={values.passwordRepeat} />
+                  <Input.Password
+                    className={inputClassName('passwordRepeat', errors, touched)}
+                    name="passwordRepeat"
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    value={values.passwordRepeat}
+                  />
                 </label>
-                {errors.passwordRepeat && touched.passwordRepeat && (<div className="input-feedback">{errors.passwordRepeat}</div>)}
+                {errors.passwordRepeat && touched.passwordRepeat && (
+                  <div className="input-feedback">{errors.passwordRepeat}</div>
+                )}
                 <label>
                   Email:
-                  <Input className={errors.email && touched.email && 'error'} name="email" onChange={handleChange} onBlur={handleBlur} value={values.email} />
+                  <Input
+                    className={inputClassName('email', errors, touched)}
+                    name="email"
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    value={values.email}
+                  />
                 </label>
-                {errors.email && touched.email && (<div className="input-feedback">{errors.email}</div>)}
+                {errors.email && touched.email && (
+                  <div className="input-feedback">{errors.email}</div>
+                )}
                 <label>
                   Website:
-                  <Input className={errors.website && touched.website && 'error'} addonBefore={selectBefore(handleChange)} addonAfter={selectAfter(handleChange)} name="domainName" placeholder="mysite" onChange={handleChange} onBlur={handleBlur} value={values.domainName} />
+                  <Input
+                    className={inputClassName('website', errors, touched)}
+                    addonBefore={selectBefore(this.onChangeDomainProtocol(handleChange))}
+                    addonAfter={selectAfter(this.onChangeDomainZone(handleChange))}
+                    name="domainName"
+                    placeholder="mysite"
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    value={values.domainName}
+                  />
                 </label>
-                {errors.website && touched.website && (<div className="input-feedback">{errors.website}</div>)}
+                {errors.website && touched.website && (
+                  <div className="input-feedback">{errors.website}</div>
+                )}
                 <label>
                   Age:
                   <Input
-                    className={errors.age && touched.age && 'error'}
+                    className={inputClassName('age', errors, touched)}
                     onChange={handleChange}
                     onBlur={handleBlur}
                     name="age"
@@ -129,26 +225,35 @@ class Register extends React.Component {
                     maxLength={2}
                   />
                 </label>
-                {errors.age && touched.age && (<div className="input-feedback">{errors.age}</div>)}
-                <DynamicInput onFinishDynamicInputSkills={this.onFinishDynamicInputSkills} onChangeRegister={(skills) => handleChange({ target: { name: "skills", value: skills } })} />
-                <Checkbox className={errors.accept && touched.accept && 'error'} name="accept" onChange={handleChange} onBlur={handleBlur} checked={values.accept}>
-                  I accept all <a href="#">terms</a>
+                {errors.age && touched.age && <div className="input-feedback">{errors.age}</div>}
+                <DynamicInput
+                  onUpdateSkills={this.onUpdateSkills(handleChange)}
+                  reset={resetSkills}
+                />
+                <Checkbox
+                  className={inputClassName('accept', errors, touched)}
+                  name="accept"
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  checked={values.accept}
+                  style={{ 'margin-bottom': '10px' }}
+                >
+                  I accept all <a href="/terms">terms</a>
                 </Checkbox>
-                {errors.accept && touched.accept && (<div className="input-feedback">{errors.accept}</div>)}
-
-                <button type="submit">
-                  Submit
-                </button>
-                <pre>
-                  { JSON.stringify(values, null, 2) }
-                </pre>
+                {errors.accept && touched.accept && (
+                  <div className="input-feedback">{errors.accept}</div>
+                )}
+                <Button type="primary" htmlType="submit">Submit</Button>
+                <div className={preloaderClassName(isSubmitting)}>
+                  <Preloader />
+                </div>
               </Form>
-            </div>
-          )}
+            );
+          }}
         </Formik>
       </div>
     );
   }
-};
+}
 
 export default Register;

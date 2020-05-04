@@ -1,22 +1,28 @@
-.dynamic-input .ant-form-item-label {
-  text-align: left;
+.dynamic-input {
+  position: relative;
 }
 
-.dynamic-input__fields-wrapper {
+.dynamic-input .dynamic-input__item {
   display: flex;
-}
-
-.dynamic-input__fields {
-  width: 60%;
-}
-
-.dynamic-input__field-item .ant-form-item-label {
-  width: 100%;
-}
-
-.dynamic-input__add-skill {
-  margin-top: auto;
-  margin-left: auto;
+  align-items: center;
+  margin-bottom: 10px;
   width: 40%;
-  height: 100%;
+}
+
+.dynamic-input .dynamic-input__input {
+  width: 90%;
+}
+
+.dynamic-input .dynamic-input__del {
+  margin-left: 8px;
+}
+
+.dynamic-input .dynamic-input__del:hover {
+  cursor: pointer;
+}
+
+.dynamic-input .dynamic-input__add {
+  position: absolute;
+  left: 40%;
+  bottom: 10px;
 }
