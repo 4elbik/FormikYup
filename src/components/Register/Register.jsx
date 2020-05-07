@@ -3,9 +3,10 @@ import { Formik, Form } from 'formik';
 import * as yup from 'yup';
 import classNames from 'classnames';
 import axios from 'axios';
+import { uniqueId, findIndex } from 'lodash';
 import { Button, Input, Checkbox, Select, notification } from 'antd';
 import Preloader from '../Preloader';
-import DynamicInput from '../DymanicInput';
+import DynamicSkills from '../DynamicSkills';
 import { ADD_NEW_USER_URL } from '../../config';
 import './Register.css';
 
@@ -70,14 +71,40 @@ const openSuccessfullNotificationWithIcon = (type) => {
 
 class Register extends React.PureComponent {
   state = {
-    skills: [],
-    resetSkills: false,
+    skills: [{ name: '', id: uniqueId() }],
   };
 
-  onUpdateSkills = (handleChange) => async (skills) => {
-    await this.setState({ skills: skills.map((el) => el.name).filter((el) => el !== '') });
-    // eslint-disable-next-line
-    handleChange({ target: { name: 'skills', value: this.state.skills } });
+  onAddSkill = () => {
+    this.setState((state) => ({ skills: [...state.skills, { name: '', id: uniqueId() }] }));
+  };
+
+  onUpdateSkill = (handleChange) => (updateId, value) => {
+    /* eslint-disable */
+    this.setState(
+      ({ skills }) => {
+        const updateElemIdx = findIndex(skills, (skill) => skill.id === updateId);
+        const newSkills = [...skills];
+        newSkills[updateElemIdx].name = value;
+        return { skills: newSkills };
+      },
+      () => handleChange({ target: { name: 'skills', value: this.state.skills } })
+    );
+    /* eslint-enable */
+  };
+
+  onRemoveSkill = (handleChange) => (removeId) => {
+    /* eslint-disable */
+    this.setState(
+      ({ skills }) => {
+        return { skills: skills.filter(({ id }) => id !== removeId) };
+      },
+      () => handleChange({ target: { name: 'skills', value: this.state.skills } })
+    );
+    /* eslint-enable */
+  };
+
+  onResetSkills = () => {
+    this.setState({ skills: [{ name: '', id: uniqueId() }] });
   };
 
   onChangeDomainProtocol = (handleChangeFormik) => (value) => {
@@ -88,15 +115,8 @@ class Register extends React.PureComponent {
     handleChangeFormik({ target: { name: 'domainZone', value } });
   };
 
-  onResetSkills = () => {
-    this.setState({ resetSkills: true });
-    setTimeout(() => {
-      this.setState({ resetSkills: false });
-    }, 500);
-  };
-
   render() {
-    const { resetSkills } = this.state;
+    const { skills } = this.state;
 
     const inputClassName = (field, errors, touched) => {
       return classNames({ error: errors[field] && touched[field] });
@@ -121,7 +141,6 @@ class Register extends React.PureComponent {
             domainName: '',
             domainZone: DEFAULT_DOMAIN_ZONE,
             age: '',
-            // skills: skills,
             skills: [],
             accept: true,
           }}
@@ -132,6 +151,10 @@ class Register extends React.PureComponent {
               const website = domainProtocol + domainName + domainZone;
               newValues.website = website;
             }
+            const filteredSkillsToBackend = values.skills
+              .map((skill) => skill.name)
+              .filter((name) => name !== '');
+            newValues.skills = filteredSkillsToBackend;
             setSubmitting(true);
             const response = await axios.post(ADD_NEW_USER_URL, newValues);
             setSubmitting(false);
@@ -226,9 +249,11 @@ class Register extends React.PureComponent {
                   />
                 </label>
                 {errors.age && touched.age && <div className="input-feedback">{errors.age}</div>}
-                <DynamicInput
-                  onUpdateSkills={this.onUpdateSkills(handleChange)}
-                  reset={resetSkills}
+                <DynamicSkills
+                  skills={skills}
+                  onAddSkill={this.onAddSkill}
+                  onUpdateSkill={this.onUpdateSkill(handleChange)}
+                  onRemoveSkill={this.onRemoveSkill(handleChange)}
                 />
                 <Checkbox
                   className={inputClassName('accept', errors, touched)}
@@ -243,7 +268,9 @@ class Register extends React.PureComponent {
                 {errors.accept && touched.accept && (
                   <div className="input-feedback">{errors.accept}</div>
                 )}
-                <Button type="primary" htmlType="submit">Submit</Button>
+                <Button type="primary" htmlType="submit">
+                  Submit
+                </Button>
                 <div className={preloaderClassName(isSubmitting)}>
                   <Preloader />
                 </div>
